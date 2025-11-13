@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Гра</title>
+  <style>
+    body { margin:0; background:#111; }
+    #defaultCanvas0 { display:block; margin:0 auto; }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
+  <script>
+    let player, enemy, coin;
+    let score = 0, gameOver = false;
+    let enemySpeed = 120, nextSpeedThreshold = 5;
+    const speedIncreasePer5 = 10;
+    const PLAYER_R = 20, ENEMY_R = 22, COIN_R = 10;
+    let audioCtx = null;
+
+    function setup() {
+      createCanvas(640, 480);
+      resetGame();
+      textFont('Arial');
+    }
+
+    function resetGame() {
+      player = createVector(width/2, height/2);
+      enemy = createVector(80, 80);
+      placeCoin();
+      score = 0;
+      enemySpeed = 120;
+      nextSpeedThreshold = 5;
+      gameOver = false;
+    }
+
+    function placeCoin() {
+      let tries = 0;
+      do {
+        coin = createVector(random(COIN_R, width-COIN_R), random(COIN_R, height-COIN_R));
+        tries++;
+      } while ((p5.Vector.dist(coin, player) < 80 || p5.Vector.dist(coin, enemy) < 80) && tries < 50);
+    }
+
+    function draw() {
+      background(18);
+
+      if (gameOver) {
+        showGameOver();
+        return;
+      }
+
+      const dt = deltaTime / 1000.0;
+      const speed = 260;
+      let mv = createVector(0,0);
+      if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) mv.x -= 1;
+      if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) mv.x += 1;
+      if (keyIsDown(UP_ARROW) || keyIsDown(87)) mv.y -= 1;
+      if (keyIsDown(DOWN_ARROW) || keyIsDown(83)) mv.y += 1;
+      if (mv.mag() > 0) {
+        mv.normalize();
+        mv.mult(speed * dt);
+        player.add(mv);
+      }
+
+      player.x = constrain(player.x, PLAYER_R, width - PLAYER_R);
+      player.y = constrain(player.y, PLAYER_R, height - PLAYER_R);
+
+      let dir = p5.Vector.sub(player, enemy);
+      if (dir.mag() > 0.1) {
+        dir.normalize();
+        dir.mult(enemySpeed * dt);
+        enemy.add(dir);
+      }
+
+      if (p5.Vector.dist(player, coin) <= PLAYER_R + COIN_R) {
+        score += 1;
+        playCoinSound();
+        placeCoin();
+        if (score >= nextSpeedThreshold) {
+          enemySpeed += speedIncreasePer5;
+          nextSpeedThreshold += 5;
+        }
+      }
+
+      if (p5.Vector.dist(player, enemy) <= PLAYER_R + ENEMY_R) {
+        gameOver = true;
+      }
+
+      noStroke();
+      fill(255, 215, 0);
+      circle(coin.x, coin.y, COIN_R*2);
+
+      fill(50, 160, 255);
+      circle(player.x, player.y, PLAYER_R*2);
+
+      fill(220, 60, 60);
+      circle(enemy.x, enemy.y, ENEMY_R*2);
+    }
+
+    function showGameOver() {
+      fill(0, 0, 0, 160);
+      rect(0, 0, width, height);
+      textAlign(CENTER, CENTER);
+      fill(255);
+      textSize(48);
+      text('Game Over', width/2, height/2 - 30);
+      textSize(20);
+      fill(220);
+      text('Очки: ' + score, width/2, height/2 + 10);
+      textSize(14);
+      fill(180);
+      text('Натисни R, щоб грати знову', width/2, height/2 + 44);
+    }
+
+    function keyPressed() {
+      if (!audioCtx) {
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          audioCtx = null;
+        }
+      }
+      if (key === 'r' || key === 'R') resetGame();
+    }
+
+    function playCoinSound() {
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(880, now);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.12, now + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start(now);
+      o.stop(now + 0.2);
+    }
+  </script>
+</body>
+</html>
